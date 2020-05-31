@@ -3,7 +3,7 @@ s = rng(94);
 %% Управление
 flag_DN = 0; % Enable/disable построение ДН
 flag_spectr = 0;% Enable/disable спектр OFDM
-flag_Steering = 1;       % Enable/disable steering Улучшает BER если prm.numR > prm.numSTS
+flag_Steering = 0;       % Enable/disable steering Улучшает BER если prm.numR > prm.numSTS
 flag_prekod = 0; % Enable/disable прекодирование  Не меняет
 flag_cor = 0;
 %% Каналы 
@@ -13,9 +13,9 @@ flag_chanel = 0; % Enable/disable MIMOCHANEL Не работает
 prm.numUsers = 1; % const
 prm.M = 16;% Порядок модуляции
 prm.bps = log2(prm.M); % Коль-во бит на символ в секунду
-prm.numSTS = 4 ; %  4/8/16/32/64
-prm.numTx = 8; % Кол-во излучающих антен
-prm.numRx = 8; % Кол-во приемных антен
+prm.numSTS = 2 ; %  4/8/16/32/64
+prm.numTx = 2; % Кол-во излучающих антен
+prm.numRx = 2; % Кол-во приемных антен
 K_norm = prm.numSTS/prm.numRx; % Нормировка по энергии
 prm.n_package = 10; % Кол-во посылок
 SNR = 0:30;% dB
@@ -60,7 +60,7 @@ spLoss = fspl(toRxRange,prm.lambda);
 [wR, arrayRx] = Receive_Beam_Steering(prm,isRxURA,toRxAng,flag_DN);
 %% Создание канальной матрицы
 prm.nRays = 300;             % Number of rays 
-[H,H1] = create_chanel(flag_my_chanel,prm);
+[H,H1] = create_chanel_old(flag_my_chanel,prm);
 % prm.posTxElem = getElementPosition(arrayTx)/prm.lambda;
 % prm.posRxElem = getElementPosition(arrayRx)/prm.lambda;
 % for ind = 1:prm.n_package

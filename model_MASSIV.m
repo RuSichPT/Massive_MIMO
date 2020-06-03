@@ -1,4 +1,4 @@
-clear;clc;close all;
+clear;clc;%close all;
 s = rng(94);
 %% Управление
 flag_DN = 0; % Enable/disable построение ДН
@@ -13,9 +13,9 @@ flag_chanel = 0; % Enable/disable MIMOCHANEL Не работает
 prm.numUsers = 1; % const
 prm.M = 16;% Порядок модуляции
 prm.bps = log2(prm.M); % Коль-во бит на символ в секунду
-prm.numSTS = 2 ; %  4/8/16/32/64
-prm.numTx = 2; % Кол-во излучающих антен
-prm.numRx = 2; % Кол-во приемных антен
+prm.numSTS = 4 ; %  4/8/16/32/64
+prm.numTx = 8; % Кол-во излучающих антен
+prm.numRx = 8; % Кол-во приемных антен
 K_norm = prm.numSTS/prm.numRx; % Нормировка по энергии
 prm.n_package = 10; % Кол-во посылок
 SNR = 0:30;% dB

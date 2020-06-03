@@ -1,24 +1,38 @@
-function [y,ltfSC] = My_helperGenPreamble(prm)
+function [y,ltfSC] = My_helperGenPreamble(prm,varargin)
 % Generate the Preamble signal for channel estimation.
+
+if nargin>1
+    v = varargin{1};
+else
+    v = complex(zeros(prm.numSC,prm.numSTS,prm.numSTS));
+    a = eye(prm.numSTS);
+    for i = 1:prm.numSC
+        v(i,:,:) = a;
+    end
+end
 Nltf = prm.numSTS; % number of preamble symbols
 
 % Frequency subcarrier tones
 x = randi([0 1],prm.numSC,1);
-ltfSC = qammod(x,2);
+ltfSC = pskmod(x,2);
 
 P = helperGetP(prm.numSTS);    
 Pred = P;
 
 % Define LTF(Long training field) and output variable sizes
-ltfTx = complex(zeros(prm.numSC,prm.numSTS));
 symLen = prm.N_FFT+prm.CyclicPrefixLength;
 
 % Generate and modulate each LTF symbol
 y = complex(zeros(symLen*Nltf,prm.numSTS));
 for i = 1:Nltf  
     ltfTx = ltfSC*Pred(:, i).';
+    for j = 1:prm.numSC
+        Q = squeeze(v(j,:,:));
+        ltfTx(j,:) = ltfTx(j,:)*Q;       
+    end
     % OFDM modulation
     tmp = ofdmmod(reshape(ltfTx, [prm.numSC,1,prm.numSTS]), ...
         prm.N_FFT, prm.CyclicPrefixLength,prm.NullCarrierIndices);
+
     y((i-1)*symLen+(1:symLen),:) = tmp;
 end

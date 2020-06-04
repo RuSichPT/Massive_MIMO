@@ -159,7 +159,16 @@ function [H,H_siso,H_STS] = create_chanel(flag_my_chanel,prm)
                 'NumScatterers',                prm.nRays, ...
                 'ScattererPositionBoundary',    scatBound, ...
                 'SeedSource',                   'Property', ...
-                'Seed',                         prm.SEED);
+                'Seed',                         prm.SEED);        
+        case 'ScatteringFlat'
+            txmipos = getElementPosition(prm.arrayTx)/prm.lambda;
+            rxmopos = getElementPosition(prm.arrayRx)/prm.lambda;
+            H = scatteringchanmtx(txmipos,rxmopos,prm.nRays);
+            
+            txmipos_M = getElementPosition(prm.arrayTx_M)/prm.lambda_M;
+            rxmopos_M = getElementPosition(prm.arrayRx_M)/prm.lambda_M;
+            H_STS = scatteringchanmtx(txmipos_M,rxmopos_M,prm.nRays);
+            H_siso =1;
             
     end
 end    

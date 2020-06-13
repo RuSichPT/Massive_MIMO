@@ -1,5 +1,5 @@
 clear;clc;close all;
-rng(67)
+% rng(67)
 prm.numTx = 4; % Кол-во излучающих антен 
 prm.numRx = 4; % Кол-во приемных антен
 prm.numSTS = 2; % Кол-во потоков 2/4/8/16/32/64

@@ -1,21 +1,21 @@
 %% ---------Модель Massiv MIMO and MIMO-------- 
 clear;clc;%close all;
-rng(21)
+rng(29)
 %% Управление
 flag_chanel_ber = 1; % Enable/disable chanel ber
 flag_constel = 0;  % Enable/disable
 flag_DN = 0; % Enable/disable построение ДН
 flag_preCod = 1; % Enable/disable прекодирование не дает улучшений
 flag_Steering = 0;       % Enable/disable steering не дает улучшений
-flag_chanel = 'RAYL'; % 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD', 'Scattering' 'ScatteringFlat'
+flag_chanel = 'Scattering'; % 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD', 'Scattering' 'ScatteringFlat'
 flag_cor_MIMO = 1; % 1-коррекция АЧХ (эквалайзер для MIMO)
 flag_cor_MM = 1; % 1-коррекция АЧХ (эквалайзер для MAS MIMO)
 flag_wav_MIMO = 0; % вейвлет шумоподавление для MIMO не работает при  prm.nRays>10
 flag_wav_MM = 0; % вейвлет шумоподавление для MAS MIMO не работает при  prm.nRays>10
 %% Параметры системы 
-prm.numTx = 8; % Кол-во излучающих антен 
-prm.numRx = 8; % Кол-во приемных антен
-prm.numSTS = 8; % Кол-во потоков 2/4/8/16/32/64
+prm.numTx = 16; % Кол-во излучающих антен 
+prm.numRx = 4; % Кол-во приемных антен
+prm.numSTS = 4; % Кол-во потоков 2/4/8/16/32/64
 prm.M = 16;% Порядок модуляции
 prm.bps = log2(prm.M); % Коль-во бит на символ в секунду
 prm.LEVEL = 3;% Уровень декомпозиции вейвлет шумоподавления min(wmaxlev(N,'db4'),floor(log2(N)))
@@ -36,7 +36,7 @@ prm.numUsers = 1; % const
 prm.n = prm.bps*prm.Nsymb_ofdm*prm.numSC;% Длина бинарного потока
 %% Координаты базовой/мобильной станций
 prm.fc = 28e9;               % 28 GHz system несущая
-prm.fc_M = 5e9;
+prm.fc_M = 28e9;
 prm.cLight = physconst('LightSpeed');
 prm.lambda = prm.cLight/prm.fc;
 prm.lambda_M = prm.cLight/prm.fc_M;
@@ -73,7 +73,7 @@ prm.posRxElem_M = getElementPosition(prm.arrayRx_M)/prm.lambda_M;
 %% Параметры канала
 prm.nRays = 10; % Для 'Scattering'   
 prm.KFactor = 1;% Для 'RIC'
-prm.SEED = 122;% Для 'RAYL_SPECIAL'  'Scattering'    586 122 12   
+prm.SEED = 86;% Для 'RAYL_SPECIAL'  'Scattering'    586 122 12   
 prm.SampleRate = 40e6;
 dt = 1/prm.SampleRate;
 switch flag_chanel
@@ -92,11 +92,12 @@ if flag_cor_MIMO == 2
     ostbcComb = comm.OSTBCCombiner('NumReceiveAntennas',prm.numRx);
     prm.n = prm.n/prm.numTx;
 end
-SNR_MAX = 60;
+SNR_MAX = 70;
 SNR = 0+floor(10*log10(prm.bps)):SNR_MAX+floor(10*log10(prm.bps*prm.numTx));
 if flag_constel == 1
-    SNR = 30;
+    SNR = 100;
 end
+numSTS = prm.numSTS;
 prm.MinNumErr = 100; % Порог ошибок для цикла 
 prm.conf_level = 0.95; % Уровень достоверности
 prm.MAX_indLoop = 1;% Максимальное число итераций в цикле while
@@ -127,16 +128,11 @@ for indExp = 1:Exp
         while (condition_MM || condition_M) && (indLoop < prm.MAX_indLoop)
             %% Зондирование канала
             if flag_preCod == 1
-%                 prm.numSTS = prm.numTx;
+                prm.numSTS = prm.numTx;
                 [preambulaSTS,ltfSC_zond] = My_helperGenPreamble(prm);
-                % Repeat over numTx
-                preambulaZond_tmp = zeros(size(preambulaSTS,1),prm.numTx);
-                for i = 1:prm.expFactorTx
-                    preambulaZond_tmp(:,(i-1)*prm.numSTS+(1:prm.numSTS)) = preambulaSTS;
-                end
                 %Прохождение канала
                 % добавляем интервал для задержки
-                preambulaZond = [preambulaZond_tmp ; zeros(prm.numPadZeros,prm.numTx)];
+                preambulaZond = [preambulaSTS ; zeros(prm.numPadZeros,prm.numTx)];
                 switch flag_chanel
                     case {'RAYL','RIC','RAYL_SPECIAL'}
 %                         H.Visualization = 'Impulse and frequency responses';
@@ -157,25 +153,26 @@ for indExp = 1:Exp
                     prm.NullCarrierIndices);
                 %Оценка канала  
                 H_estim_zond = My_helperMIMOChannelEstimate(Zond_out,ltfSC_zond,prm);
-%                 prm.numSTS =  prm.numSTS/prm.expFactorTx;
-                [wP,wC] = diagbfweights(H_estim_zond);
+                prm.numSTS =  prm.numSTS/prm.expFactorTx;
+                [wP,wC] = diagbfweights(H_estim_zond);              
 %                 squeeze(wP(1,:,:))*squeeze(H_estim_zond(1,:,:))*squeeze(wC(1,:,:))
             end
             %% Формируем данные
-            Inp_data = randi([0 1],prm.n,prm.numSTS); % Передаваемые данные
-            Inp_data_tmp = reshape(Inp_data,prm.n*prm.numSTS,1);
+            Inp_data = randi([0 1],prm.n,numSTS); % Передаваемые данные
+            Inp_data_tmp = reshape(Inp_data,prm.n*numSTS,1);
             %% Модулятор
             % MIMO
             Mod_data_inp_tmp = qammod(Inp_data,prm.M,'InputType','bit');% Модулятор QAM-M для полезной инф
-            Mod_data_inp = reshape(Mod_data_inp_tmp,prm.numSC,prm.Nsymb_ofdm,prm.numSTS);
+            Mod_data_inp = reshape(Mod_data_inp_tmp,prm.numSC,prm.Nsymb_ofdm,numSTS);
             Mod_data_inp_M = Mod_data_inp;
             if flag_preCod ==1
                     for j = 1:prm.numSC
-                        Q = squeeze(wP(j,:,:));
-                        Mod_data_inp(j,:,:) = squeeze(Mod_data_inp(j,:,:))*Q;       
+                        Q = squeeze(wP(j,1:numSTS,:));
+                        Mod_data_inp_Tx(j,:,:) = squeeze(Mod_data_inp(j,:,:))*Q;       
                     end
+                    Mod_data_inp = Mod_data_inp_Tx;
                 % Модулятор пилотов  MIMO
-                [preambula,ltfSC] = My_helperGenPreamble(prm,wP);
+                [preambula,ltfSC] = My_helperGenPreamble(prm,wP(:,1:numSTS,:));
             else
                 % Модулятор пилотов  MIMO
                 [preambula,ltfSC] = My_helperGenPreamble(prm);
@@ -184,17 +181,14 @@ for indExp = 1:Exp
             OFDM_data_STS = ofdmmod(Mod_data_inp,prm.N_FFT,prm.CyclicPrefixLength,...
                          prm.NullCarrierIndices);                            
             OFDM_data_STS = [preambula ; OFDM_data_STS];
+            OFDM_data_STS = 1/sqrt(prm.expFactorTx)*OFDM_data_STS; % Нормируем мощность
             
             [preambula_M,ltfSC_M] = My_helperGenPreamble(prm);
             OFDM_data_STS_M = ofdmmod(Mod_data_inp_M,prm.N_FFT,prm.CyclicPrefixLength,...
                          prm.NullCarrierIndices);                      
             OFDM_data_STS_M = [preambula_M ; OFDM_data_STS_M];
-%             % Repeat over numTx (Порядок важен)
-            for i = 1:prm.numSTS 
-%                 OFDM_data_STS = 1/sqrt(prm.expFactorTx)*OFDM_data_STS; % Нормируем мощность
-                Inp_dataMod(:,(i-1)*prm.expFactorTx+(1:prm.expFactorTx)) = ...
-                    repmat(OFDM_data_STS(:,i),1,prm.expFactorTx);
-            end
+            
+            Inp_dataMod = OFDM_data_STS;
             Inp_dataMod_M = OFDM_data_STS_M;
             %% Формируем луч на передачу
             if flag_Steering==1
@@ -252,7 +246,7 @@ for indExp = 1:Exp
 %             end
             %% Оценка канала  
             H_estim = My_helperMIMOChannelEstimate(Mod_data_out(:,1:prm.numSTS,:),ltfSC,prm);
-            H_estim_STS = My_helperMIMOChannelEstimate(Mod_data_out_M(:,1:prm.numSTS,:),ltfSC_M,prm);
+            H_estim_STS = My_helperMIMOChannelEstimate(Mod_data_out_M(:,1:prm.numSTS,:),ltfSC_M,prm);      
             %% Вейвлет шумоподавление
             if flag_wav_MM == 1
                 H_estim = H_WAV_my_mimo(H_estim,prm.LEVEL);
@@ -359,7 +353,7 @@ figure()
 % plot_ber(ther_ber,Eb_N0,1,'g',1.5,0)
 % plot_ber(ther_ber1,Eb_N0,1,'r',1.5,0)
 if flag_chanel_ber ==1
-    color = {'r';'b';'g';'c';'m';'y';'--r';'--b';'--g';'--c';'--m';'--y'};
+    color = {'r';'b';'g';'c';'m';'y';'--r';'--b';'--g';'--c';'--m';'--y';':r';':b';':g';':c';':m';':y'};
 %     color = {'r';'b';'g';'c'};
     for m = 1:prm.numSTS
         plot_ber(ber_mean(m,:),SNR(1:size(ber_mean,2)),prm.bps,color{m},1.5,0)

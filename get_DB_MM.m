@@ -1,5 +1,4 @@
-%% ---------Модель Massiv MIMO and MIMO-------- 
-clear;clc;%close all;
+function get_DB_MM(numTx,numRx,numSTS,indLoop,snr,EXP)
 %% Управление
 flag_chanel_ber = 1; % Enable/disable chanel ber
 flag_constel = 0;  % Enable/disable
@@ -12,9 +11,9 @@ flag_cor_MM = 1; % 1-коррекция АЧХ (эквалайзер для MAS MIMO)
 flag_wav_MIMO = 0; % вейвлет шумоподавление для MIMO не работает при  prm.nRays>10
 flag_wav_MM = 0; % вейвлет шумоподавление для MAS MIMO не работает при  prm.nRays>10
 %% Параметры системы 
-prm.numTx = 2; % Кол-во излучающих антен 
-prm.numRx = 2; % Кол-во приемных антен
-prm.numSTS = 2; % Кол-во потоков 2/4/8/16/32/64
+prm.numTx = numTx; % Кол-во излучающих антен 
+prm.numRx = numRx; % Кол-во приемных антен
+prm.numSTS = numSTS; % Кол-во потоков 2/4/8/16/32/64
 prm.M = 16;% Порядок модуляции
 prm.bps = log2(prm.M); % Коль-во бит на символ в секунду
 prm.LEVEL = 3;% Уровень декомпозиции вейвлет шумоподавления min(wmaxlev(N,'db4'),floor(log2(N)))
@@ -63,12 +62,9 @@ isTxURA_M = 0;isRxURA_M = 0; prm.expFactorTx_M = 1;  prm.expFactorRx_M = 1;
 %expFactor во сколько раз антенн больше чем потоков.
 [wT, prm.arrayTx] = Transmit_Beam_Steering(prm,prm.numTx,prm.fc,prm.lambda,prm.expFactorTx,isTxURA,flag_DN);
 [wR, prm.arrayRx] = Receive_Beam_Steering(prm,prm.numRx,prm.fc,prm.lambda,prm.expFactorRx,isRxURA,flag_DN);
-[wT_M, prm.arrayTx_M] = Transmit_Beam_Steering(prm,prm.numSTS,prm.fc_M,prm.lambda_M,prm.expFactorTx_M,isTxURA_M,flag_DN);
-[wR_M, prm.arrayRx_M] = Receive_Beam_Steering(prm,prm.numSTS,prm.fc_M,prm.lambda_M,prm.expFactorRx_M,isRxURA_M,flag_DN);
-prm.posTxElem = getElementPosition(prm.arrayTx)/prm.lambda;
-prm.posRxElem = getElementPosition(prm.arrayRx)/prm.lambda;
-prm.posTxElem_M = getElementPosition(prm.arrayTx_M)/prm.lambda_M;
-prm.posRxElem_M = getElementPosition(prm.arrayRx_M)/prm.lambda_M;
+% prm.posTxElem = getElementPosition(prm.arrayTx)/prm.lambda;
+% prm.posRxElem = getElementPosition(prm.arrayRx)/prm.lambda;
+
 %% Параметры канала
 prm.nRays = 10; % Для 'Scattering'   
 prm.KFactor = 1;% Для 'RIC'
@@ -91,7 +87,7 @@ if flag_cor_MIMO == 2
     ostbcComb = comm.OSTBCCombiner('NumReceiveAntennas',prm.numRx);
     prm.n = prm.n/prm.numTx;
 end
-SNR_MAX = 100;
+SNR_MAX = snr;
 SNR = 0+floor(10*log10(prm.bps)):SNR_MAX+floor(10*log10(prm.bps*prm.numSTS));
 if flag_constel == 1
     SNR = 100;
@@ -99,18 +95,16 @@ end
 numSTS = prm.numSTS;
 prm.MinNumErr = 100; % Порог ошибок для цикла 
 prm.conf_level = 0.95; % Уровень достоверности
-prm.MAX_indLoop = 1;% Максимальное число итераций в цикле while
+prm.MAX_indLoop = indLoop;% Максимальное число итераций в цикле while
 prm.MaxNumZero = 2; %  max кол-во нулевых точек в цикле while
 Koeff = 1/15;%Кол-во процентов от BER  7%
-Exp = 1;% Кол-во опытов
+Exp = EXP;% Кол-во опытов
 for indExp = 1:Exp
     %% Создание канала
-    [H,~,H_STS] = create_chanel(flag_chanel,prm);
+    [H,~,~] = create_chanel(flag_chanel,prm);
     NumZero = 0; % кол-во нулевых точек
     for indSNR = 1:length(SNR)
-        berconf_M = 0;
         berconf_MM = 0;
-        ErrNum_M = 0; % кол-во ошибок MIMO
         if flag_chanel_ber ==1
             ErrNum_MM = zeros(1,prm.numSTS);% кол-во ошибок  M MIMO
         else
@@ -118,13 +112,11 @@ for indExp = 1:Exp
         end
         indLoop = 0;  % индикатор итераций цикла while
         LenIntLoop_MM = 100;
-        LenIntLoop_M = 100;
-        condition_M = ((LenIntLoop_M > berconf_M*Koeff)||(ErrNum_M < prm.MinNumErr));
         condition_MM = ((LenIntLoop_MM > berconf_MM*Koeff)||(ErrNum_MM < prm.MinNumErr));
         if (NumZero >= prm.MaxNumZero)
             break;
         end
-        while (condition_MM || condition_M) && (indLoop < prm.MAX_indLoop)
+        while condition_MM && (indLoop < prm.MAX_indLoop)
             %% Зондирование канала
             if flag_preCod == 1
                 prm.numSTS = prm.numTx;
@@ -182,10 +174,6 @@ for indExp = 1:Exp
             OFDM_data_STS = [preambula ; OFDM_data_STS];
             OFDM_data_STS = 1/sqrt(prm.expFactorTx)*OFDM_data_STS; % Нормируем мощность
             
-            [preambula_M,ltfSC_M] = My_helperGenPreamble(prm);
-            OFDM_data_STS_M = ofdmmod(Mod_data_inp_M,prm.N_FFT,prm.CyclicPrefixLength,...
-                         prm.NullCarrierIndices);                      
-            OFDM_data_STS_M = [preambula_M ; OFDM_data_STS_M];
             if flag_preCod ~=1
                 % Repeat over numTx (Порядок важен)
                 for i = 1:prm.numSTS 
@@ -195,7 +183,6 @@ for indExp = 1:Exp
             else
             Inp_dataMod = OFDM_data_STS;
             end
-            Inp_dataMod_M = OFDM_data_STS_M;
             %% Формируем луч на передачу
             if flag_Steering==1
                 Inp_dataMod = Inp_dataMod.*conj(wT).';
@@ -203,26 +190,19 @@ for indExp = 1:Exp
             %% Прохождение канала
             % добавляем интервал для задержки
             Inp_dataMod_tmp = [Inp_dataMod ; zeros(prm.numPadZeros,prm.numTx)];
-            Inp_dataMod_tmp_M = [Inp_dataMod_M ; zeros(prm.numPadZeros,prm.numSTS)];
             switch flag_chanel
                 case {'RAYL','RIC','RAYL_SPECIAL'}
     %                 H.Visualization = 'Impulse and frequency responses';
     %                 H.AntennaPairsToDisplay = [2,2];
     %                 H_siso.Visualization = 'Impulse and frequency responses';
                     [Chanel_data, H_ist] = H(Inp_dataMod_tmp);
-                    [Chanel_data_M, H_ist_M] = H_STS(Inp_dataMod_tmp_M);
                     chanDelay = 0;
-                    chanDelay_M = 0;
                 case 'Scattering'                  
                     [Chanel_data, H_ist,tau] = H(Inp_dataMod_tmp);
-                    [Chanel_data_M, H_ist_M,tau_M] = H_STS(Inp_dataMod_tmp_M);
                     chanDelay = floor(min(tau)*prm.SampleRate); 
-                    chanDelay_M = floor(min(tau_M)*prm.SampleRate);
                 otherwise                  
                     Chanel_data  = Inp_dataMod_tmp*H;
-                    Chanel_data_M  = Inp_dataMod_tmp_M*H_STS;
                     chanDelay = 0;
-                    chanDelay_M = 0;
             end
             %% Прием
             if flag_Steering==1
@@ -232,17 +212,12 @@ for indExp = 1:Exp
 %             Noise_data = awgn(Chanel_data,SNR(indSNR),'measured');
 %             Noise_data_M = awgn(Chanel_data_M,SNR(indSNR),'measured');
             [Noise_data,sigma] = my_awgn(Chanel_data,SNR(indSNR));%SNR(indSNR)
-            [Noise_data_M,sigma_M] = my_awgn(Chanel_data_M,SNR(indSNR));%SNR(indSNR)
 
             % Убираем задержку и усиливаем
             Gain = db2pow(spLoss_db);
-            Gain_M = db2pow(spLoss_M_db);
-            Noise_data_tmp = Noise_data(chanDelay+1:end-(prm.numPadZeros-chanDelay),:)*Gain;
-            Noise_data_tmp_M = Noise_data_M(chanDelay_M+1:end-(prm.numPadZeros-chanDelay_M),:)*Gain_M;          
+            Noise_data_tmp = Noise_data(chanDelay+1:end-(prm.numPadZeros-chanDelay),:)*Gain;         
             %% Демодулятор OFDM
             Mod_data_out = ofdmdemod(Noise_data_tmp,prm.N_FFT,prm.CyclicPrefixLength,prm.CyclicPrefixLength, ...
-                prm.NullCarrierIndices);
-            Mod_data_out_M = ofdmdemod(Noise_data_tmp_M,prm.N_FFT,prm.CyclicPrefixLength,prm.CyclicPrefixLength, ...
                 prm.NullCarrierIndices);
 %             if flag_preCod ==1
 %                 for j = 1:prm.numSC
@@ -251,23 +226,15 @@ for indExp = 1:Exp
 %                 end
 %             end
             %% Оценка канала  
-            H_estim = My_helperMIMOChannelEstimate(Mod_data_out(:,1:prm.numSTS,:),ltfSC,prm);
-            H_estim_STS = My_helperMIMOChannelEstimate(Mod_data_out_M(:,1:prm.numSTS,:),ltfSC_M,prm);      
+            H_estim = My_helperMIMOChannelEstimate(Mod_data_out(:,1:prm.numSTS,:),ltfSC,prm);        
             %% Вейвлет шумоподавление
             if flag_wav_MM == 1
                 H_estim = H_WAV_my_mimo(H_estim,prm.LEVEL);
-            end
-            if flag_wav_MIMO == 1
-                H_estim_STS = H_WAV_my_mimo(H_estim_STS,prm.LEVEL);
             end
             %% Эквалайзер
             %ZF Massiv MIMO
             if flag_cor_MM == 1
                 Mod_data_out_tmp = My_MIMO_Equalize_ZF_numSC(Mod_data_out(:,prm.numSTS+1:end,:),H_estim);
-%                 Out_data = My_MIMO_Equalize_ML_numSC(Mod_data_out(:,prm.numSTS+1:end,:),H_estim,prm.M,prm.numSTS);
-%                 num_k = 2;
-%                 Out_data = My_MIMO_Equalize_K_BEST_numSC(Mod_data_out(:,prm.numSTS+1:end,:),num_k,H_estim,prm.M,prm.numTx,Inp_data);
-%                 Mod_data_out_tmp = My_MIMO_Equalize_MMSE_numSC(Mod_data_out(:,prm.numSTS+1:end,:),H_estim,sigma);
                 Mod_data_out = reshape(Mod_data_out_tmp,prm.numSC*prm.Nsymb_ofdm,prm.numSTS);
             else
                 Mod_data_out_ZF_tmp = Mod_data_out(:,prm.numSTS+1:end,:);
@@ -275,25 +242,12 @@ for indExp = 1:Exp
                 Mod_data_out_ZF1 = reshape(Mod_data_out_ZF_tmp,prm.numSC*prm.Nsymb_ofdm,prm.numRx);
                 Mod_data_out = Mod_data_out_ZF1*H_tmp/prm.expFactorRx;
             end
-            %ZF MIMO
-            if flag_cor_MIMO == 1
-                Mod_data_out_ZF_tmp_M = My_MIMO_Equalize_ZF_numSC(Mod_data_out_M(:,prm.numSTS+1:end,:),H_estim_STS);
-                Mod_data_out_ZF_M = reshape(Mod_data_out_ZF_tmp_M,prm.numSC*prm.Nsymb_ofdm,prm.numSTS);
-            else
-                Mod_data_out_ZF_tmp_M = Mod_data_out_M(:,prm.numSTS+1:end,:);
-                Mod_data_out_ZF_M = reshape(Mod_data_out_ZF_tmp_M,prm.numSC*prm.Nsymb_ofdm,prm.numSTS);
-            end
             %% Демодулятор
             if flag_constel == 1
                 scatterplot(Mod_data_out(:));
             end
             Out_data = qamdemod(Mod_data_out,prm.M,'OutputType','bit');
             Out_data_tmp = reshape(Out_data,prm.n*prm.numSTS,1);
-            if flag_constel == 1
-                scatterplot(Mod_data_out_ZF_M(:));
-            end
-            Out_data_M = qamdemod(Mod_data_out_ZF_M,prm.M,'OutputType','bit');
-            Out_data_M_tmp  = reshape(Out_data_M,prm.n*prm.numSTS,1);
             %% Выходные данные
             if flag_chanel_ber ==1
                 for m = 1:prm.numSTS
@@ -302,7 +256,6 @@ for indExp = 1:Exp
             else
                 ErrNum_MM = ErrNum_MM+sum(abs(Out_data_tmp-Inp_data_tmp)); 
             end
-            ErrNum_M = ErrNum_M+sum(abs(Out_data_M_tmp-Inp_data_tmp));
             %%
             indLoop = indLoop+1;
             if flag_chanel_ber ==1
@@ -319,11 +272,8 @@ for indExp = 1:Exp
                 condition_MM = ((LenIntLoop_MM > berconf_MM/15)||(ErrNum_MM < prm.MinNumErr));
                 ErrNum_MM_max = ErrNum_MM;
             end
-            [berconf_M,conf_int_M] = berconfint(ErrNum_M,indLoop*length(Inp_data_tmp),prm.conf_level);
-            LenIntLoop_M = conf_int_M(2)-conf_int_M(1);
-            condition_M = ((LenIntLoop_M > berconf_M/15)||(ErrNum_M < prm.MinNumErr));
         end
-        if (ErrNum_MM_max == 0)&&(ErrNum_M==0)
+        if (ErrNum_MM_max == 0)
             NumZero = NumZero+1;
         end
         if flag_chanel_ber ==1
@@ -333,14 +283,11 @@ for indExp = 1:Exp
         else
             ber(indExp,indSNR) = berconf_MM;
         end
-        ber_M(indExp,indSNR) = berconf_M;
-        if ErrNum_M>ErrNum_MM_max
-            ErrNum_disp = ErrNum_M;
-            name = 'Er_MIMO';
-        else
-            ErrNum_disp = ErrNum_MM_max;
-            name = 'Er_MMIMO';
-        end
+        
+
+        ErrNum_disp = ErrNum_MM_max;
+        name = 'Er_MMIMO';
+
         fprintf(['Complete %d db ' name ' = %d, ind = %d NZ = %d\n'],...
             SNR(indSNR),ErrNum_disp,indLoop,NumZero);
     end
@@ -353,32 +300,14 @@ if flag_chanel_ber ==1
 else
     ber_mean = mean(ber,1);
 end
-ber_M_mean = mean(ber_M,1);
-SNR = SNR(1:max(size(ber_M_mean,2),size(ber_mean,2)));
-Eb_N0_M = SNR -(10*log10(prm.bps*prm.numSTS));
+
+SNR = SNR(1:size(ber_mean,2));
+Eb_N0_MM = SNR -(10*log10(prm.bps*prm.numSTS));
 Eb_N0 = 0:60;
-ther_ber = berfading(Eb_N0,'qam',256,1);
-% ther_ber1 = berawgn(Eb_N0,'qam',4);
-figure() 
-% plot_ber(ther_ber,Eb_N0,1,'g',1.5,0)
-% plot_ber(ther_ber1,Eb_N0,1,'r',1.5,0)
-if flag_chanel_ber ==1
-    color = {'r';'b';'g';'c';'m';'y';'--r';'--b';'--g';'--c';'--m';'--y';':r';':b';':g';':c';':m';':y'};
-%     color = {'r';'b';'g';'c'};
-    for m = 1:prm.numSTS
-        plot_ber(ber_mean(m,:),SNR(1:size(ber_mean,2)),prm.bps,color{m},1.5,0)
-    end
-    mean_bear = mean(ber_mean,1);
-    plot_ber(mean_bear,SNR(1:size(ber_mean,2)),prm.bps*prm.numSTS,'k',1.5,0)
-%     legend('1','2','3','4','mean');
-else
-    plot_ber(ber_mean,SNR(1:size(ber_mean,2)),prm.bps*prm.numSTS,'k',1.5,0)
-end
-plot_ber(ber_M_mean,SNR(1:size(ber_M_mean,2)),prm.bps*prm.numSTS,'--k',3,0)
-% str1 = ['MASSIV MIMO ' num2str(prm.numTx) 'x'  num2str(prm.numRx)];
-% str2 = ['MIMO ' num2str(prm.numSTS) 'x'  num2str(prm.numSTS)];
-% legend(str1,str2);
+
 str = ['DataBase/' flag_chanel '/'  num2str(prm.numTx) 'x' num2str(prm.numRx) 'x' num2str(prm.numSTS)  '_pre ='...
     num2str(flag_preCod) '_ster =' num2str(flag_Steering) '_' flag_chanel '_Wmm=' ...
     num2str(flag_wav_MM) '_Wm=' num2str(flag_wav_MIMO) '_Exp=' num2str(Exp) '.mat'];
-% save(str,'ber_mean','ber_M_mean','SNR','prm','ber','ber_M')
+save(str,'ber_mean','SNR','prm','ber')
+end
+

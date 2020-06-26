@@ -1,9 +1,9 @@
-function get_DB_MM(numTx,numRx,numSTS,indLoop,snr,EXP)
+function get_DB_MM(numTx,numRx,numSTS,Fprecod,indLoop,snr,EXP)
 %% Управление
 flag_chanel_ber = 1; % Enable/disable chanel ber
 flag_constel = 0;  % Enable/disable
 flag_DN = 0; % Enable/disable построение ДН
-flag_preCod = 1; % Enable/disable прекодирование не дает улучшений
+flag_preCod = Fprecod; % Enable/disable прекодирование не дает улучшений
 flag_Steering = 0;       % Enable/disable steering не дает улучшений
 flag_chanel = 'RAYL'; % 'AWGN' ,'RAYL','RIC','RAYL_SPECIAL','STATIC', 'BAD', 'Scattering' 'ScatteringFlat'
 flag_cor_MIMO = 1; % 1-коррекция АЧХ (эквалайзер для MIMO)
